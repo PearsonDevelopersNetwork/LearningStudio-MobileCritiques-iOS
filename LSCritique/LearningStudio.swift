@@ -154,7 +154,7 @@ class LearningStudio {
         }
         
         // If not, we'll need to get one
-        var session = NSURLSession.sharedSession()
+        let session = NSURLSession.sharedSession()
         
         // Only the app's id and client string are required
         // This only allows OAuth2 with the user's credentials
@@ -164,15 +164,15 @@ class LearningStudio {
         
         // post to the token url
         let tokenUrl = NSURL(string: apiDomain + "/token")
-        var tokenRequest = NSMutableURLRequest(URL: tokenUrl!)
+        let tokenRequest = NSMutableURLRequest(URL: tokenUrl!)
         tokenRequest.HTTPMethod = "POST"
         
         // with the app id, username, and password
-        var fullUsername = config["client_string"]! + "\\" + username
+        let fullUsername = clientString + "\\" + username
         let postString = "grant_type=password&client_id=\(appId)&username=\(fullUsername)&password=\(password)"
         tokenRequest.HTTPBody = postString.dataUsingEncoding(NSUTF8StringEncoding)
         
-        var requestDate = NSDate()
+        let requestDate = NSDate()
         let tokenTask = session.dataTaskWithRequest(tokenRequest, completionHandler: { (tokenData, tokenResponse, tokenError) -> Void in
             
             // return on error
@@ -191,7 +191,14 @@ class LearningStudio {
             
             // parse the json
             var tokenErr: NSError?
-            var tokenJson = NSJSONSerialization.JSONObjectWithData(tokenData, options: NSJSONReadingOptions.MutableContainers, error: &tokenErr) as! NSDictionary
+            var tokenJson: [String : AnyObject]?
+            do {
+                tokenJson = try NSJSONSerialization.JSONObjectWithData(tokenData!, options: NSJSONReadingOptions.MutableContainers) as? [String : AnyObject]
+            }
+            catch let error as NSError {
+                tokenErr = error
+            }
+            
             if tokenErr != nil {
                 // return if there is an error parsing JSON
                 callback(accessToken:nil, error: tokenErr)
@@ -199,11 +206,11 @@ class LearningStudio {
             }
             
             // extract the token
-            if let accessToken = tokenJson["access_token"] as? String {
+            if let accessToken = tokenJson!["access_token"] as? String {
                 // store the token and expriation date
-                var expiresIn = tokenJson["expires_in"] as! Double
+                let expiresIn = tokenJson!["expires_in"] as! Double
                 self.tokenExpireDate = requestDate.dateByAddingTimeInterval(expiresIn)
-                self.tokens=tokenJson // save the token for later
+                self.tokens=tokenJson! // save the token for later
                 callback(accessToken:accessToken, error:nil)
             }
             else {
@@ -225,16 +232,18 @@ class LearningStudio {
             }
             
             // otherwise, perform the operation
-            var session = NSURLSession.sharedSession()
+            let session = NSURLSession.sharedSession()
             
+            // the path may already be a full path if following a link from response, so only prepend the domain when needed.
             let dataUrl = path.rangeOfString(self.apiDomain) == nil ?  NSURL(string: self.apiDomain + path) : NSURL(string: path)
-            var dataRequest = NSMutableURLRequest(URL: dataUrl!)
+            let dataRequest = NSMutableURLRequest(URL: dataUrl!)
             dataRequest.HTTPMethod = httpMethod
             // include request body if applicable
             if data != nil {
                 
+                // we can handle json and binary input data types
                 if dataType == "application/json" {
-                    if let jsonData = NSJSONSerialization.dataWithJSONObject(data!, options: nil, error: nil) {
+                    if let jsonData = try? NSJSONSerialization.dataWithJSONObject(data!, options: []) {
                         if let jsonString = NSString(data: jsonData, encoding: NSUTF8StringEncoding) {
                             dataRequest.HTTPBody = jsonString.dataUsingEncoding(NSUTF8StringEncoding)
                         }
@@ -260,9 +269,11 @@ class LearningStudio {
                     if data is String {
                         // file details
                         let pathToFile = data as! String
-                        fullFilename = pathToFile.lastPathComponent
-                        let pathExtension = pathToFile.pathExtension
-                        let filenameRange = Range(start: fullFilename.startIndex, end: advance(fullFilename.startIndex,count(fullFilename)-count(pathExtension)-1))
+                        let urlToFile = NSURL(fileURLWithPath: pathToFile)
+                        
+                        fullFilename = urlToFile.lastPathComponent!
+                        let pathExtension = urlToFile.pathExtension!
+                        let filenameRange = Range(start: fullFilename.startIndex, end: fullFilename.startIndex.advancedBy(fullFilename.characters.count-pathExtension.characters.count-1))
                         filename = fullFilename.substringWithRange(filenameRange)
                         formData = NSData(contentsOfFile: pathToFile)!
                     }
@@ -277,22 +288,22 @@ class LearningStudio {
                     }
                     
                     // create boundaries
-                    var boundary:String = "Boundary-\(NSUUID().UUIDString)"
-                    var startBoundary:String = "--\(boundary)\r\n"
-                    var endBoundary:String = "\r\n--\(boundary)--"
+                    let boundary:String = "Boundary-\(NSUUID().UUIDString)"
+                    let startBoundary:String = "--\(boundary)\r\n"
+                    let endBoundary:String = "\r\n--\(boundary)--"
                     
                     // build request data
-                    var body = NSMutableString()
+                    let body = NSMutableString()
                     body.appendFormat(startBoundary)
                     body.appendFormat("Content-Disposition: form-data; name=\"\(filename)\"; filename=\"\(fullFilename)\"\r\n")
                     body.appendFormat("Content-Type: \(mimeType)\r\n\r\n")
-                    var myRequestData:NSMutableData = NSMutableData()
+                    let myRequestData:NSMutableData = NSMutableData()
                     myRequestData.appendData(body.dataUsingEncoding(NSUTF8StringEncoding)!)
                     myRequestData.appendData(formData!)
                     myRequestData.appendData(endBoundary.dataUsingEncoding(NSUTF8StringEncoding)!)
                     
                     // populate request
-                    var contentType = "multipart/form-data; boundary=\(boundary)"
+                    let contentType = "multipart/form-data; boundary=\(boundary)"
                     dataRequest.setValue(contentType, forHTTPHeaderField: "Content-Type")
                     dataRequest.setValue("\(myRequestData.length)", forHTTPHeaderField: "Content-Length")
                     dataRequest.HTTPBody = myRequestData
@@ -317,19 +328,27 @@ class LearningStudio {
                 let httpResponse = response as! NSHTTPURLResponse
                 // trap 400 and 500 errors. 500 just happens sometimes. Not expecting any 400s
                 if httpResponse.statusCode >= 400 {
-                    println("RECEIVED ERROR CODE \(httpResponse.statusCode)")
+                    print("RECEIVED ERROR CODE \(httpResponse.statusCode)")
                     callback(data: nil,
                         error: NSError(domain: self.errorDomainName, code: self.errorUnexpectedApiResponse, userInfo: nil))
                     return
                 }
                 
                 // return data if available
-                if data != nil && data.length != 0 {
+                if data != nil && data!.length != 0 {
                     let contentType = httpResponse.allHeaderFields["content-type"] as! String
                     if contentType.hasPrefix("application/json") {
                         // parse the json
                         var err: NSError?
-                        var json: AnyObject? = NSJSONSerialization.JSONObjectWithData(data, options: NSJSONReadingOptions.MutableContainers, error: &err)
+                        var json: AnyObject?
+                        do {
+                            json = try NSJSONSerialization.JSONObjectWithData(data!, options: NSJSONReadingOptions.MutableContainers)
+                        } catch let error as NSError {
+                            err = error
+                            json = nil
+                        } catch {
+                            fatalError()
+                        }
                         if err != nil {
                             callback(data:nil, error:err)
                             return
@@ -354,7 +373,7 @@ class LearningStudio {
     }
     
     
-    // Asynchronously performs GET operation that returns ile
+    // Asynchronously performs GET operation that returns file
     private func getFile(path: String, callback: (data:NSData?, error:NSError?) -> Void) {
         doOperation("GET",path: path, dataType: "multipart/form-data", data: nil,callback: { (data: AnyObject?, error:NSError?) -> Void in
             callback(data: data as? NSData, error: error)
@@ -384,7 +403,7 @@ class LearningStudio {
     
     // MARK: - API Route Wrappers
     
-    // Retrieves user info and inits other data in userData container. Populates me attribute
+    // Retrieves user/me info
     func getMe(callback: (data: [String:AnyObject]?, error:NSError?) -> Void) {
         getJson("/me", callback: { (data, error) -> Void in
             
@@ -402,7 +421,7 @@ class LearningStudio {
         getJson("/me/terms", callback: { (data, error) -> Void in
             if error == nil {
                 
-                var dateFormatter = NSDateFormatter()
+                let dateFormatter = NSDateFormatter()
                 dateFormatter.timeZone = NSTimeZone(name: self.defaultTimeZone)
                 dateFormatter.dateFormat = self.normalDateFormat
                 var currentDate = dateFormatter.stringFromDate(NSDate())
@@ -411,11 +430,11 @@ class LearningStudio {
                 var startDate: String?
                 var endDate: String?
                 
-                var terms = data!["terms"] as! [[String:AnyObject]]
+                let terms = data!["terms"] as! [[String:AnyObject]]
                 for term in terms {
                     
-                    var termStartDate = term["startDateTime"] as! String
-                    var termEndDate = term["endDateTime"] as! String
+                    let termStartDate = term["startDateTime"] as! String
+                    let termEndDate = term["endDateTime"] as! String
                     // skip terms without startDate < currentDate < endDate
                     if currentDate.compare(termStartDate) == NSComparisonResult.OrderedAscending ||
                         currentDate.compare(termEndDate) == NSComparisonResult.OrderedDescending {
@@ -446,9 +465,9 @@ class LearningStudio {
                 }
                 
                 // convert to dates
-                var start = dateFormatter.dateFromString(startDate!)
-                var end = dateFormatter.dateFromString(endDate!)
-                var current = dateFormatter.dateFromString(currentDate)
+                let start = dateFormatter.dateFromString(startDate!)
+                let end = dateFormatter.dateFromString(endDate!)
+                let current = dateFormatter.dateFromString(currentDate)
                 
                 // convert the date format
                 dateFormatter.dateFormat = self.shortDateFormat
@@ -457,18 +476,18 @@ class LearningStudio {
                 currentDate = dateFormatter.stringFromDate(current!)
                 
                 // format the date ranges
-                var startRange = "\(startDate!),\(currentDate)"
-                var endRange = "\(currentDate),\(endDate!)"
+                let startRange = "\(startDate!),\(currentDate)"
+                let endRange = "\(currentDate),\(endDate!)"
                 
                 self.getJson("/me/courses?expand=course&startDatesBetween=\(startRange)&endDatesBetween=\(endRange)", callback: { (data, error) -> Void in
                     
                     if error == nil {
                         // remove unnecessary nesting in data
                         var newCourses: [[String:AnyObject]] = []
-                        var courses = data!["courses"] as! [AnyObject]
+                        let courses = data!["courses"] as! [AnyObject]
                         for course in courses {
                             var courseLinks = course["links"] as! [[String:AnyObject]]
-                            var courseLinksCourse = courseLinks[0]["course"] as! [String:AnyObject]
+                            let courseLinksCourse = courseLinks[0]["course"] as! [String:AnyObject]
                             newCourses.append(courseLinksCourse)
                         }
                         
@@ -491,7 +510,7 @@ class LearningStudio {
         getJson("/courses/\(courseId)/docSharingCategories", callback: { (data, error) -> Void in
             
             if error == nil {
-                var docSharingData = data!["docSharingCategories"] as! [[String:AnyObject]]
+                let docSharingData = data!["docSharingCategories"] as! [[String:AnyObject]]
                 var critiques: [[String:AnyObject]] = []
                 for docSharing in docSharingData {
                     // the course has it's own category. exclude it and any groups
@@ -543,7 +562,7 @@ class LearningStudio {
                 var tempFiles = data!["tempFiles"] as! [[String:AnyObject]]
                 var tempFile = tempFiles[0] // should be only one
                 // create json for doc sharing
-                var docSharingData = [
+                let docSharingData = [
                     "docSharingDocuments" : [
                         [
                             "fileDescription" : nameForFile,
@@ -613,17 +632,17 @@ class LearningStudio {
         updateSocialProfileByPersona(getPersonaId(), data: data, callback: callback)
     }
     
-      // Retrieves user's personaId
+    // Retrieves user's personaId by the the user route found in links of other responses
     func getPersonaIdByUser(courseId: Int, userRoute: String, callback: (personaId: String?, error:NSError?) -> Void) {
         // prevent 403
         // can't call /users/{userId} on other users as student because of 403
         // can't use /me/classmates/{userId} because student can't retrieve teacher
         // using /courses/{courseId}/roster/{userId} instead.
-        var userRouteMod = userRoute.stringByReplacingOccurrencesOfString("/users/", withString: "/courses/\(courseId)/roster/")
+        let userRouteMod = userRoute.stringByReplacingOccurrencesOfString("/users/", withString: "/courses/\(courseId)/roster/")
         getJson(userRouteMod, callback: { (data, error) in
             if error == nil {
                 var rosterMember = data!["rosterMember"] as! [String:AnyObject]
-                var personaId = rosterMember["personaId"] as! String
+                let personaId = rosterMember["personaId"] as! String
                 callback(personaId: personaId, error: nil)
             }
             else {
@@ -632,7 +651,7 @@ class LearningStudio {
         })
     }
     
-    // Retrieves user's social profile
+    // Retrieves user's social profile avatar
     func getAvatarByPersona(personaId: String, thumbnail: Bool, callback: (data: NSData?, error:NSError?) -> Void) {
         var route = "/social/v1/avatar/\(personaId)"
         if thumbnail {
@@ -654,17 +673,19 @@ class LearningStudio {
         getAvatarByPersona(getPersonaId(), thumbnail: thumbnail, callback: callback)
     }
     
+    // update a user's avatar
     func updateAvatarByPersona(personaId: String, image: UIImage, callback: (error:NSError?) -> Void) {
         putImage("/social/v1/avatar/\(personaId)", image: image, callback: { (data, error) in
             callback(error: error)
         })
     }
     
+    // Convenience method for updating the logged in user's avatar
     func updateAvatar(image: UIImage, callback: (error:NSError?) -> Void) {
         updateAvatarByPersona(getPersonaId(), image: image, callback: callback)
     }
     
-    
+    // Determine if user is moderator a course
     func isModerator(courseId: Int, callback: (data: Bool?, error:NSError?) -> Void) {
         getJson("/me/courses/\(courseId)/role", callback: { (data, error) -> Void in
             if error == nil {
@@ -678,6 +699,7 @@ class LearningStudio {
         })
     }
     
+    // Convenience method that assembles personaId from known pattern
     func getPersonaId() -> String {
         let clientString = config["client_string"]!
         return "\(clientString)_\(username)"
@@ -687,7 +709,7 @@ class LearningStudio {
     func convertDate(dateString: String, humanize: Bool = false) -> String {
         
         // convert from default timezone
-        var dateFormatter = NSDateFormatter()
+        let dateFormatter = NSDateFormatter()
         dateFormatter.dateFormat = normalDateFormat
         dateFormatter.timeZone = NSTimeZone(name: defaultTimeZone)
         

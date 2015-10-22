@@ -31,13 +31,15 @@
 
 import UIKit
 
+// List contributions by person to current critique
 class PersonPresentedTableViewController: UITableViewController {
     
     private let critiqueCellIdentifier = "personItemCell"
+    
+    // supports display
     private var docSharingDocuments: [String : [[String : AnyObject]]]?
     private var docSharingPersonas: [String]?
     private var userPersonas: [String : String]?
-    
     
     // http://stackoverflow.com/questions/29912852/how-to-show-activity-indicator-while-tableview-loads
     var activityIndicator: UIActivityIndicatorView?
@@ -65,6 +67,7 @@ class PersonPresentedTableViewController: UITableViewController {
                 
                 var newDocSharingDocuments : [String : [[String : AnyObject]]] = [:]
                 
+                // groups files by user
                 for doc in data! {
                     let fileName = doc["fileName"] as! String
                     
@@ -75,7 +78,7 @@ class PersonPresentedTableViewController: UITableViewController {
                     
                     var submitter = doc["submitter"] as! [String:AnyObject]
                     var submitterLinks = submitter["links"] as! [[String:String]]
-                    var userRoute = submitterLinks[0]["href"]!
+                    let userRoute = submitterLinks[0]["href"]!
                     
                     if newDocSharingDocuments[userRoute] == nil {
                         newDocSharingDocuments[userRoute] = []
@@ -161,7 +164,7 @@ class PersonPresentedTableViewController: UITableViewController {
     
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) 
         
         let firstDoc = docSharingDocuments![docSharingPersonas![indexPath.row]]![0]
         let submitter = firstDoc["submitter"] as! [String:AnyObject]
@@ -170,9 +173,9 @@ class PersonPresentedTableViewController: UITableViewController {
         cell.textLabel!.text = personName
         cell.detailTextLabel?.text = String(docSharingDocuments![docSharingPersonas![indexPath.row]]!.count)
         
-        var docSharingPersona = userPersonas![docSharingPersonas![indexPath.row]]
+        let docSharingPersona = userPersonas![docSharingPersonas![indexPath.row]]
         if docSharingPersona != nil {
-            var docSharingPersonaImage = getDocSharingPersonaImage(docSharingPersona!)
+            let docSharingPersonaImage = getDocSharingPersonaImage(docSharingPersona!)
             if docSharingPersonaImage != nil {
                 cell.imageView?.image = docSharingPersonaImage!
             }
@@ -205,7 +208,7 @@ class PersonPresentedTableViewController: UITableViewController {
             self.presentViewController(alertController, animated: true, completion: nil)
         }
         else {
-            self.docSharingPersonas = Array(self.docSharingDocuments!.keys).sorted { self.userPersonas![$0] < self.userPersonas![$1] }
+            self.docSharingPersonas = Array(self.docSharingDocuments!.keys).sort { self.userPersonas![$0] < self.userPersonas![$1] }
             tableView.reloadData()
         }
     }
@@ -214,9 +217,13 @@ class PersonPresentedTableViewController: UITableViewController {
         self.loadData()
     }
     
+    // MARK:- Segue related methods
+    
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
         
     }
+    
+    // MARK:- Utility Methods to access logic on tabController
     
     private func getDocSharingCategoryId() -> Int {
         let tabBar = self.tabBarController as! StageTabBarController

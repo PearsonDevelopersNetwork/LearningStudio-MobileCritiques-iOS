@@ -26,8 +26,8 @@ These social LearningStudio APIs could be used to add additional functionality:
 
 ### Build Environment 
 
-  * XCode 6.4.4 is required.
-  * Swift 1.2 is required
+  * XCode 7.0.1 or greater is required.
+  * Swift 2.0 is required
 
 ### Server Environment
 
@@ -66,7 +66,7 @@ Note: The application only uses OAuth2 with the user's credentials, so the secre
 
 The application can be run through the simulator from XCode. It's a universal app, so any device should work. We've tested with iPhone 6.
 
-Note: Best results with the peer to peer technology were acheived by all devices disabling bluetooth and connecting to the same wifi network.
+Note: The simulator was very unreliable for the peer to peer functionality after upgrading to Xcode7. Best results were achieved with actual devices on the same wifi network and bluetooth disabled. 
 
 ## License
 

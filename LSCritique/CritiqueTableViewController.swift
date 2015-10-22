@@ -31,6 +31,7 @@
 
 import UIKit
 
+// List the doc sharing categories for a course
 class CritiqueTableViewController: UITableViewController {
 
     var courseId: Int?
@@ -45,6 +46,7 @@ class CritiqueTableViewController: UITableViewController {
         
         self.refreshControl?.addTarget(self, action: "refresh:", forControlEvents: UIControlEvents.ValueChanged)
         self.tableView.backgroundView = UIImageView(image: UIImage(named: "spotlight"))
+        self.tableView.backgroundView?.layer.zPosition -= 1; // otherwise, we hide the refresh control
     }
     
     override func viewWillAppear(animated: Bool) {
@@ -106,13 +108,15 @@ class CritiqueTableViewController: UITableViewController {
     
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) 
         cell.textLabel!.text = docSharingCategories![indexPath.row]["title"] as? String
         
         cell.backgroundColor = UIColor(white: 1.0, alpha: 0.2) // iPad won't respect IB cell color
         
         return cell
     }
+    
+    // MARK: - Data load helper methods
     
     func reloadScreenData() {
         self.refreshControl?.endRefreshing()
@@ -134,12 +138,14 @@ class CritiqueTableViewController: UITableViewController {
         self.loadData()
     }
 
+    // MARK: - Segue handling
+    
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
         let indexPath = tableView.indexPathForCell(sender as! UITableViewCell)
         let configureController = segue.destinationViewController as! ConfigureTableViewController
         
         var category = docSharingCategories![indexPath!.row]
-        var categoryId = category["id"] as! Int
+        let categoryId = category["id"] as! Int
         configureController.courseId = courseId
         configureController.docSharingCategoryId = categoryId
         

@@ -32,9 +32,12 @@
 import UIKit
 import AVFoundation
 
+// List presenters of the current critique
 class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate  {
 
     private let critiqueCellIdentifier = "critiqueItemCell"
+    
+    // supports display and playback
     private var docSharingDocuments: [[String : AnyObject]]?
     private var audioPlayer:AVAudioPlayer?
     private var userPersonas: [String : String]?
@@ -76,7 +79,7 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
                     
                     var submitter = doc["submitter"] as! [String:AnyObject]
                     var submitterLinks = submitter["links"] as! [[String:String]]
-                    var userRoute = submitterLinks[0]["href"]!
+                    let userRoute = submitterLinks[0]["href"]!
                     
                     if self.userPersonas![userRoute] == nil {
                         LearningStudio.api.getPersonaIdByUser(self.getCourseId(), userRoute: userRoute, callback: { (personaId, error) in
@@ -156,7 +159,7 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
     
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(critiqueCellIdentifier, forIndexPath: indexPath) 
        
         let rowInData = docSharingDocuments!.count - indexPath.row - 1
         let doc = docSharingDocuments![rowInData]
@@ -168,11 +171,11 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
         
         var submitter = doc["submitter"] as! [String:AnyObject]
         var submitterLinks = submitter["links"] as! [[String:String]]
-        var userRoute = submitterLinks[0]["href"]!
+        let userRoute = submitterLinks[0]["href"]!
         let personaId = userPersonas![userRoute]
         
         if personaId != nil {
-            var docSharingImage = getDocSharingPersonaImage(personaId!)
+            let docSharingImage = getDocSharingPersonaImage(personaId!)
             if  docSharingImage != nil {
                 cell.imageView?.image = docSharingImage!
             }
@@ -191,11 +194,27 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
         return cell
     }
     
+    // playback audio when row pressed
+    override func tableView(tableView: UITableView, accessoryButtonTappedForRowWithIndexPath indexPath: NSIndexPath) {
+        clickedTableCell(tableView, indexPath: indexPath)
+    }
+    
+    // playback audio when row pressed
     override func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
+        clickedTableCell(tableView, indexPath: indexPath)
+    }
+    
+    // performs the playback of audio when row pressed
+    private func clickedTableCell(tableView: UITableView, indexPath: NSIndexPath) {
+        // don't allow accessoryButton to get around this
+        if !tableView.allowsSelection {
+            return
+        }
+        
         tableView.allowsSelection=false
         dispatch_async(dispatch_get_main_queue()) {
             self.activityIndicator = UIActivityIndicatorView(activityIndicatorStyle: .White)
-            var yCoordinate = (self.tableView.rectForRowAtIndexPath(indexPath).minY + self.tableView.rectForRowAtIndexPath(indexPath).maxY ) / 2.0
+            let yCoordinate = (self.tableView.rectForRowAtIndexPath(indexPath).minY + self.tableView.rectForRowAtIndexPath(indexPath).maxY ) / 2.0
             self.activityIndicator!.center = CGPointMake(self.view.center.x, yCoordinate)
             self.view.addSubview(self.activityIndicator!)
             self.activityIndicator!.startAnimating()
@@ -208,13 +227,26 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
             if error == nil {
                 var audioError: NSError?
                 let audioSession = AVAudioSession.sharedInstance()
-                audioSession.setCategory(AVAudioSessionCategoryPlayback, error: &audioError)
-                
-                if audioError != nil {
-                    println("audioSession error: \(audioError!.localizedDescription)")
+                do {
+                    try audioSession.setCategory(AVAudioSessionCategoryPlayback)
+                } catch let error as NSError {
+                    audioError = error
+                } catch {
+                    fatalError()
                 }
                 
-                self.audioPlayer = AVAudioPlayer(data: data!, error: &audioError)
+                if audioError != nil {
+                    print("audioSession error: \(audioError!.localizedDescription)")
+                }
+                
+                do {
+                    self.audioPlayer = try AVAudioPlayer(data: data!)
+                } catch let error as NSError {
+                    audioError = error
+                    self.audioPlayer = nil
+                } catch {
+                    fatalError()
+                }
                 
                 if audioError == nil {
                     self.audioPlayer?.delegate = self
@@ -267,11 +299,14 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
         self.loadData()
     }
     
-    func audioPlayerDidFinishPlaying(player: AVAudioPlayer!, successfully flag: Bool) {
+    
+    // MARK:- Audio playback related methods
+    
+    func audioPlayerDidFinishPlaying(player: AVAudioPlayer, successfully flag: Bool) {
         resetScreenAfterPlayback()
     }
     
-    func audioPlayerDecodeErrorDidOccur(player: AVAudioPlayer!, error: NSError!) {
+    func audioPlayerDecodeErrorDidOccur(player: AVAudioPlayer, error: NSError?) {
         resetScreenAfterPlayback()
     }
     
@@ -290,9 +325,13 @@ class PresentedTableViewController: UITableViewController, AVAudioPlayerDelegate
         }
     }
     
+    // MARK:- Segue related methods
+    
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
 
     }
+    
+    // MARK:- Utility Methods to access logic on tabController
     
     private func getDocSharingCategoryId() -> Int {
         let tabBar = self.tabBarController as! StageTabBarController

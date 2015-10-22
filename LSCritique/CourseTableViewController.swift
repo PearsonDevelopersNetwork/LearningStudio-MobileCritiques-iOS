@@ -31,6 +31,7 @@
 
 import UIKit
 
+// List the courses available to a user
 class CourseTableViewController: UITableViewController {
     
     var courses: [[String : AnyObject]]?
@@ -44,6 +45,7 @@ class CourseTableViewController: UITableViewController {
         
         self.refreshControl?.addTarget(self, action: "refresh:", forControlEvents: UIControlEvents.ValueChanged)
         self.tableView.backgroundView = UIImageView(image: UIImage(named: "spotlight"))
+        self.tableView.backgroundView?.layer.zPosition -= 1; // otherwise, we hide the refresh control
     }
     
     override func viewWillAppear(animated: Bool) {
@@ -103,7 +105,7 @@ class CourseTableViewController: UITableViewController {
     
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(courseCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(courseCellIdentifier, forIndexPath: indexPath) 
         cell.textLabel!.text = courses![indexPath.row]["title"] as? String
         
         cell.backgroundColor = UIColor(white: 1.0, alpha: 0.2) // iPad won't respect IB cell color
@@ -111,9 +113,12 @@ class CourseTableViewController: UITableViewController {
         return cell
     }
     
+    // MARK: - Data load helper methods
+    
     func reloadScreenData() {
         self.refreshControl?.endRefreshing()
         
+        // failure to load courses is sign of a serious issue. Maybe student not enrolled anymore or wifi disabled
         if courses == nil {
             let alertController = UIAlertController(title: "Try again", message:
                 "Failed to load courses.", preferredStyle: UIAlertControllerStyle.Alert)
@@ -132,13 +137,15 @@ class CourseTableViewController: UITableViewController {
         self.loadData()
     }
 
+    // MARK: - Segue handling
+    
     override func prepareForSegue(segue: UIStoryboardSegue, sender: AnyObject?) {
 
         let indexPath = tableView.indexPathForCell(sender as! UITableViewCell)
         let critiqueController = segue.destinationViewController as! CritiqueTableViewController
         
         var course = courses![indexPath!.row]
-        var courseId = course["id"] as! Int
+        let courseId = course["id"] as! Int
         critiqueController.courseId = courseId
         
     }

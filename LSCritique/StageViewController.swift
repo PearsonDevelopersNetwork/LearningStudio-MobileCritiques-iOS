@@ -32,15 +32,18 @@
 import UIKit
 import AVFoundation
 
+// Stage for critique
 class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDelegateProtocol {
     
     var critiqueManager:CritiqueManager?
     
+    // data for user and speaker - used for display and file names
     private var userProfile: [String:AnyObject]?
     private var speakerProfileForCritiquePersonaId: String?
     private var speakerProfile: [String:AnyObject]?
     private var isModerator: Bool?
     
+    // utility related
     private var audioRecording = false
     private var audioRecorder: AVAudioRecorder?
     private var soundFilePath: String? // TODO - rethink this
@@ -60,12 +63,14 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         
         self.audioToggleButton.enabled = false
         
+        // prepare the screen based on the user's role
+        
         let personaId = LearningStudio.api.getPersonaId()
         
         LearningStudio.api.isModerator(getCourseId(), callback: { (data, error) in
             if error == nil {
                 self.isModerator = data!
-                var critiqueInfo = CritiqueInfo(personaId: personaId, isModerator: data!, courseId: self.getCourseId(), critiqueId: self.getDocSharingCategoryId())
+                let critiqueInfo = CritiqueInfo(personaId: personaId, isModerator: data!, courseId: self.getCourseId(), critiqueId: self.getDocSharingCategoryId())
                 self.critiqueManager = CritiqueManager(critiqueInfo: critiqueInfo)
                 self.critiqueManager?.delegate = self
                 
@@ -104,6 +109,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
             }
         })
         
+        // make the button round
         audioToggleButton.layer.cornerRadius = audioToggleButton.bounds.width / 2
         audioToggleButton.layer.masksToBounds = true
         
@@ -114,6 +120,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         
         self.navigationItem.leftBarButtonItem = UIBarButtonItem(barButtonSystemItem: UIBarButtonSystemItem.Pause, target: self, action: "closeStage:")
         
+        // keep the screen from going to sleep
         UIApplication.sharedApplication().idleTimerDisabled = true
     }
     
@@ -123,6 +130,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
     }
     
 
+    // exit the stage
     func closeStage(sender: UIBarButtonItem) {
         audioRecorder = nil
         soundFilePath = nil
@@ -130,6 +138,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         self.dismissViewControllerAnimated(true, completion: nil)
     }
     
+    // moderator can end critiques
     func releaseStage(sender: UIBarButtonItem) {
         dispatch_async(dispatch_get_main_queue()) {
             self.navigationItem.rightBarButtonItem = nil
@@ -137,61 +146,79 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         critiqueManager?.releaseStage()
     }
 
+    // MARK:- Audio Recording
     
+    // These tutorials were helpful
     // http://www.appcoda.com/ios-avfoundation-framework-tutorial/
     // http://www.techotopia.com/index.php/Recording_Audio_on_iOS_8_with_AVAudioRecorder_in_Swift
     
+    // where to save audio files
     private func getDocsDir() -> String {
         let dirPaths =
         NSSearchPathForDirectoriesInDomains(.DocumentDirectory,
             .UserDomainMask, true)
-        return dirPaths[0] as! String
+        return dirPaths[0] 
     }
     
+    // prepare for audio recording
     private func initAudio() {
         
         if !shouldRecordCritique() {
             return
         }
 
-        let docsDir = getDocsDir()
+        let docsDir = NSURL(fileURLWithPath: getDocsDir())
         soundFilePath =
-        docsDir.stringByAppendingPathComponent("critique.m4a")
+        docsDir.URLByAppendingPathComponent("critique.m4a").path
         
         var error: NSError?
         
         if NSFileManager.defaultManager().fileExistsAtPath(soundFilePath!) {
-            NSFileManager.defaultManager().removeItemAtPath(soundFilePath!, error: &error)
+            do {
+                try NSFileManager.defaultManager().removeItemAtPath(soundFilePath!)
+            } catch let error1 as NSError {
+                error = error1
+            }
         }
         
         if let err = error {
-            println("audioSession error: \(err.localizedDescription)")
+            print("audioSession error: \(err.localizedDescription)")
         }
         
         let soundFileURL = NSURL(fileURLWithPath: soundFilePath!)
-        let recordSettings =
-           [ AVNumberOfChannelsKey: 2,
-            AVSampleRateKey: 44100.0,
-            AVFormatIDKey:  kAudioFormatMPEG4AAC]
+        let recordSettings: [String : AnyObject] = [
+            AVNumberOfChannelsKey: NSNumber(int:2),
+            AVSampleRateKey: NSNumber(double: 44100.0),
+            AVFormatIDKey:  NSNumber(int: Int32(kAudioFormatMPEG4AAC))
+        ]
         
         let audioSession = AVAudioSession.sharedInstance()
-        audioSession.setCategory(AVAudioSessionCategoryRecord,
-            error: &error)
-        
-        if let err = error {
-            println("audioSession error: \(err.localizedDescription)")
+        do {
+            try audioSession.setCategory(AVAudioSessionCategoryRecord)
+        } catch let error1 as NSError {
+            error = error1
         }
         
-        audioRecorder = AVAudioRecorder(URL: soundFileURL,
-            settings: recordSettings as [NSObject : AnyObject], error: &error)
+        if let err = error {
+            print("audioSession error: \(err.localizedDescription)")
+        }
+        
+        do {
+            audioRecorder = try AVAudioRecorder(URL: soundFileURL,
+                settings: recordSettings)
+        } catch let error1 as NSError {
+            error = error1
+            audioRecorder = nil
+        }
         
         if let err = error {
-            println("audioSession error: \(err.localizedDescription)")
+            print("audioSession error: \(err.localizedDescription)")
         } else {
             audioRecorder?.prepareToRecord()
         }
     }
     
+    // keep a timer while user is speaking
     var timeSpent = 0
     func updateTimer() {
         
@@ -213,6 +240,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         self.timerLabel.text = timeString
     }
     
+    // start a timer when enabled
     private func startTimer() {
         if !shouldShowTimer() {
             return
@@ -225,6 +253,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // reset the timer when enabled
     private func resetTimer() {
         if !shouldShowTimer() {
             return
@@ -239,6 +268,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // record audio when enabled
     private func recordAudio() {
         
         if !shouldRecordCritique() {
@@ -251,6 +281,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // stop audio when enabled. Otherise, simulate audio stopping
     private func stopAudio() {
         
         resetTimer()
@@ -280,24 +311,25 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
     func audioPlayerDecodeErrorDidOccur(player: AVAudioPlayer!, error: NSError!) {
     }
     
-    func audioRecorderDidFinishRecording(recorder: AVAudioRecorder!, successfully flag: Bool) {
+    // save audio when recording finished
+    func audioRecorderDidFinishRecording(recorder: AVAudioRecorder, successfully flag: Bool) {
         
         animateWhileWaiting()
         
-        let docsDir = getDocsDir()
+        let docsDir = NSURL(fileURLWithPath: getDocsDir())
         
         // name of speaker
         let userProfileId =  userProfile!["id"] as! String
         let userProfileName = userProfile!["name"] as! [String:String]
-        var userFirstName = userProfileName["givenName"] as String?
-        var userLastName = userProfileName["familyName"] as String?
+        let userFirstName = userProfileName["givenName"] as String?
+        let userLastName = userProfileName["familyName"] as String?
         let userDisplayName = userFirstName == "" && userLastName == "" ? userProfileId : "\(userFirstName!) \(userLastName!)"
         
         // cleanse the filename
-        var charactersToAllow = NSMutableCharacterSet.alphanumericCharacterSet() // start with broad range of chars to allow
+        let charactersToAllow = NSMutableCharacterSet.alphanumericCharacterSet() // start with broad range of chars to allow
         charactersToAllow.addCharactersInString("_") // add the other characters
         let charactersToRemove = charactersToAllow.invertedSet // invert to remove everything else
-        let userFileName = "".join(userDisplayName.componentsSeparatedByCharactersInSet(charactersToRemove))
+        let userFileName = userDisplayName.componentsSeparatedByCharactersInSet(charactersToRemove).joinWithSeparator("")
         
         
         var fileDescription = "\(userDisplayName) presents"
@@ -307,41 +339,49 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         // "{PresenterName}_presents.m4a" or "{CritiquerName}_critique-for_{PresenterName}.m4a"
         
         if self.speakerProfileForCritiquePersonaId != nil { // change the filename if this is a critique not a presentation
-            var speakerProfileId = self.speakerProfileForCritiquePersonaId!
+            let speakerProfileId = self.speakerProfileForCritiquePersonaId!
             var speakerDisplayName = speakerProfileId
             if speakerProfile != nil {
                 let speakerProfileName = speakerProfile!["name"] as! [String:String]
-                var speakerFirstName = speakerProfileName["givenName"] as String?
-                var speakerLastName = speakerProfileName["familyName"] as String?
+                let speakerFirstName = speakerProfileName["givenName"] as String?
+                let speakerLastName = speakerProfileName["familyName"] as String?
             
                 speakerDisplayName = speakerFirstName == "" && speakerLastName == "" ? speakerProfileId : "\(speakerFirstName!) \(speakerLastName!)"
             }
-            let speakerFileName = "".join(speakerDisplayName.componentsSeparatedByCharactersInSet(charactersToRemove))
+            let speakerFileName = speakerDisplayName.componentsSeparatedByCharactersInSet(charactersToRemove).joinWithSeparator("")
             
             fileDescription = "\(userDisplayName) critique for  \(speakerDisplayName)"
             newFileName = "\(userFileName)_critique-for_\(speakerFileName).m4a"
         }
         
-        let newFilePath = docsDir.stringByAppendingPathComponent(newFileName)
+        let newFilePath = docsDir.URLByAppendingPathComponent(newFileName).path!
         
         var fileError:NSError?
         
         // attempt cleanup if needed
         if NSFileManager.defaultManager().fileExistsAtPath(newFilePath) {
-            NSFileManager.defaultManager().removeItemAtPath(newFilePath, error: &fileError)
+            do {
+                try NSFileManager.defaultManager().removeItemAtPath(newFilePath)
+            } catch let error as NSError {
+                fileError = error
+            }
         }
         
         if fileError != nil {
-            println("Failed to delete file: \(fileError!.localizedDescription)")
+            print("Failed to delete file: \(fileError!.localizedDescription)")
             // TODO - what to do?
             enableUIAfterRecording()
             return
         }
         
-        NSFileManager.defaultManager().moveItemAtPath(soundFilePath!, toPath: newFilePath, error: &fileError)
+        do {
+            try NSFileManager.defaultManager().moveItemAtPath(soundFilePath!, toPath: newFilePath)
+        } catch let error as NSError {
+            fileError = error
+        }
         
         if fileError != nil {
-            println("Failed to move file: \(fileError!.localizedDescription)")
+            print("Failed to move file: \(fileError!.localizedDescription)")
             // TODO - what to do?
             enableUIAfterRecording()
             return
@@ -350,6 +390,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         uploadAudio(newFilePath, newFileName: fileDescription)
     }
     
+    // upload audio to doc sharing
     func uploadAudio(newFilePath: String, newFileName: String) {
         
         self.critiqueManager!.droppingHand() // begin dropping hand when uploading audio
@@ -358,10 +399,16 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         LearningStudio.api.uploadAudioToDocSharing(getCourseId(), docSharingCategoryId: getDocSharingCategoryId(), pathToFile: newFilePath, nameForFile: newFileName, callback: { (error) -> Void  in
             // TODO - handle error and delete file on success
             if error == nil {
-                NSFileManager.defaultManager().removeItemAtPath(newFilePath, error: &fileError)
+                do {
+                    try NSFileManager.defaultManager().removeItemAtPath(newFilePath)
+                } catch let error as NSError {
+                    fileError = error
+                } catch {
+                    fatalError()
+                }
                 
                 if fileError != nil {
-                    println("Failed to delete file: \(fileError!.localizedDescription)")
+                    print("Failed to delete file: \(fileError!.localizedDescription)")
                     // TODO - what to do?
                 }
                 
@@ -376,7 +423,13 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
                         self.uploadAudio(newFilePath, newFileName: newFileName)
                     }))
                     alertController.addAction(UIAlertAction(title: "OK", style: UIAlertActionStyle.Default,handler: {_ in
-                        NSFileManager.defaultManager().removeItemAtPath(newFilePath, error: &fileError)
+                        do {
+                            try NSFileManager.defaultManager().removeItemAtPath(newFilePath)
+                        } catch let error as NSError {
+                            fileError = error
+                        } catch {
+                            fatalError()
+                        }
                         self.enableUIAfterRecording()
                     }))
                     self.presentViewController(alertController, animated: true, completion: nil)
@@ -385,9 +438,10 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         })
     }
     
-    func audioRecorderEncodeErrorDidOccur(recorder: AVAudioRecorder!, error: NSError!) {
+    func audioRecorderEncodeErrorDidOccur(recorder: AVAudioRecorder, error: NSError?) {
     }
     
+    // prevent leaving screen while speaking without stopping first
     private func disableUIDuringRecording() {
         
         startTimer()
@@ -399,6 +453,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // enable screen once speaking ends
     private func enableUIAfterRecording() {
         
         resetTimer()
@@ -416,6 +471,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
 
+    // Change speaker state based on button press
     @IBAction func toggleAudio(sender: UIButton) {
     
         sender.enabled = false;
@@ -447,6 +503,8 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
 
+    // MARK:- animation methods for button
+    
     private var animationStarted = false
     private func animateWhileWaiting() {
         dispatch_async(dispatch_get_main_queue()) {
@@ -454,6 +512,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // button animates until enabled
     private func keepAnimatingWhileWaiting() {
     
         var transform: CGAffineTransform?
@@ -540,13 +599,13 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         if personaId != nil && !available &&  // load image if we are just spectating
             !(isModerator! && personaId == userPersonaId) { // moderator needs a special case (available=false when hand raised)
             // load the avatar of the speaker
-            var docSharingPersonaImage = self.getDocSharingPersonaImage(personaId!)
+            let docSharingPersonaImage = self.getDocSharingPersonaImage(personaId!)
             if docSharingPersonaImage == nil  { // load it fresh
                 // load the avatar of the speaker
                 LearningStudio.api.getAvatarByPersona(personaId!, thumbnail: false, callback: { (data, error) in
                     if error == nil {
                         dispatch_async(dispatch_get_main_queue()) {
-                            var image = UIImage(data: data!)
+                            let image = UIImage(data: data!)
                             self.audioToggleButton.setBackgroundImage(image, forState: .Normal)
                             self.setDocSharingPersonaImage(personaId!, image: image)
                         }
@@ -607,6 +666,7 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
             }
         }
         
+        // configure button as appropriate
         dispatch_async(dispatch_get_main_queue()) {
             if available && personaId == nil {
                 if critiqueForPersonaId == nil {
@@ -628,12 +688,15 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
     }
     
+    // MARK:- Factoid related methods
+    
     private func clearFactiods() {
         dispatch_async(dispatch_get_main_queue()) {
             self.factoidLabel.text = ""
         }
     }
     
+    // shows random facts from the speaker's profile
     private func showRandomFactoids() {
         if speakerProfile == nil {
             clearFactiods()
@@ -687,6 +750,8 @@ class StageViewController: UIViewController, AVAudioRecorderDelegate, CritiqueDe
         }
 
     }
+    
+    // MARK:- Utility Methods to access logic on tabController
     
     private func getDocSharingCategoryId() -> Int {
         let tabBar = self.tabBarController as! StageTabBarController

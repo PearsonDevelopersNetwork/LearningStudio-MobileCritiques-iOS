@@ -31,6 +31,7 @@
 
 import UIKit
 
+// Configuration for app (logout only right now)
 class SettingsTableViewController: UITableViewController {
 
     private let optionCellIdentifier = "optionSettingsCell"
@@ -72,7 +73,7 @@ class SettingsTableViewController: UITableViewController {
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
         if indexPath.section == 1 {
-            var cell = tableView.dequeueReusableCellWithIdentifier(optionCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+            let cell = tableView.dequeueReusableCellWithIdentifier(optionCellIdentifier, forIndexPath: indexPath) 
             cell.textLabel?.text = "Logout"
             
             cell.backgroundColor = UIColor(white: 1.0, alpha: 0.2) // iPad won't respect IB cell color
@@ -81,7 +82,7 @@ class SettingsTableViewController: UITableViewController {
         }
 
         // Later
-        var cell = tableView.dequeueReusableCellWithIdentifier(optionCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(optionCellIdentifier, forIndexPath: indexPath) 
         cell.textLabel?.text = " "
         return cell
     }

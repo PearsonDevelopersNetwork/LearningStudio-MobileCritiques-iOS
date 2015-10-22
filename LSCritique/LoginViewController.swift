@@ -31,6 +31,7 @@
 
 import UIKit
 
+// Login screen
 class LoginViewController: UIViewController {
 
     @IBOutlet weak var usernameTextfield: UITextField!
@@ -42,6 +43,7 @@ class LoginViewController: UIViewController {
     override func viewDidLoad() {
         super.viewDidLoad()
 
+        // keep the password hidden
         passwordTextfield.secureTextEntry=true
         
         let backgroundImageView = UIImageView(image: UIImage(named: "spotlight"))
@@ -53,12 +55,14 @@ class LoginViewController: UIViewController {
     override func viewWillAppear(animated: Bool) {
         super.viewWillAppear(animated)
         
+        // don't show the login. we might already be logged in
         self.view.hidden = true
     }
     
     override func viewDidAppear(animated: Bool) {
         super.viewDidAppear(animated)
         
+        // login if we have credentials. otherwise, show login screen
         if LearningStudio.api.restoreCredentials() {
             self.performSegueWithIdentifier("mainAppSegue", sender: self)
         }
@@ -89,8 +93,8 @@ class LoginViewController: UIViewController {
         activityIndicator!.startAnimating()
         
         // trim username and password
-        var usernameText = usernameTextfield.text.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceCharacterSet())
-        var passwordText = passwordTextfield.text.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceCharacterSet())
+        let usernameText = usernameTextfield.text!.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceCharacterSet())
+        let passwordText = passwordTextfield.text!.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceCharacterSet())
         
         // check if credentials provided
         if usernameText == "" || passwordText == "" {

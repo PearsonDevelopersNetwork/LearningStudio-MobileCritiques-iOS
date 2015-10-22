@@ -30,6 +30,7 @@
 */
 
 
+// Protocol used by CritiqueManager delegate
 protocol CritiqueDelegateProtocol {
     
     func critiqueAvailabilityChanged(critiqueInfo: CritiqueInfo, available:Bool, personaId: String?, critiqueForPersonaId: String?)

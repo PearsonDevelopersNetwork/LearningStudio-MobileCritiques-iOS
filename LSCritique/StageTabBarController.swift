@@ -31,6 +31,7 @@
 
 import UIKit
 
+//  Controls and shares data across stage
 class StageTabBarController: UITabBarController {
     var courseId: Int?
     var docSharingCategoryId: Int?
@@ -38,16 +39,12 @@ class StageTabBarController: UITabBarController {
     
     
     private var docSharingPersonaImages: [String : UIImage?]? = [ : ]
-    private var charactersToRemove: NSCharacterSet!
     
     override func viewDidLoad() {
         super.viewDidLoad()
 
         // Do any additional setup after loading the view.
-        
-        var charactersToAllow = NSMutableCharacterSet.alphanumericCharacterSet() // start with broad range of chars to allow
-        charactersToAllow.addCharactersInString("_") // add the other characters
-        charactersToRemove = charactersToAllow.invertedSet // invert to remove everything else
+
     }
 
     override func didReceiveMemoryWarning() {
@@ -61,8 +58,9 @@ class StageTabBarController: UITabBarController {
         courseId = nil
         docSharingCategoryId = nil
         docSharingPersonaImages = nil
-        charactersToRemove = nil
     }
+    
+    // MARK:- Utility methods shared by tab views
     
     func getDocSharingPersonaImage(personaId: String) -> UIImage? {
         if docSharingPersonaImages![personaId] == nil {

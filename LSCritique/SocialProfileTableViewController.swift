@@ -31,12 +31,14 @@
 
 import UIKit
 
+// Manages and displays social profile for user
 class SocialProfileTableViewController: UITableViewController,  UINavigationControllerDelegate, UIImagePickerControllerDelegate {
 
     private let profileNameCellIdentifier = "profileNameCell"
     private let profileItemCellIdentifier = "profileItemCell"
     private let profileEditCellIdentifier = "profileEditCell"
     
+    // for editing
     private var socialProfile: [String : AnyObject]?
     private var avatar: UIImage?
     private var profileEdited = false
@@ -197,7 +199,7 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
            
             let cellContentView = tableView.cellForRowAtIndexPath(indexPath)!.contentView
             let cellTextField = cellContentView.subviews[cellContentView.subviews.count-1] as! UITextField
-            var newValue = cellTextField.text
+            var newValue = cellTextField.text!
             newValue = newValue.stringByTrimmingCharactersInSet(NSCharacterSet.whitespaceAndNewlineCharacterSet())
             if newValue != "" {
                 var rows = getSectionRows(indexPath.section)
@@ -275,7 +277,7 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
             cellName = profileEditCellIdentifier
         }
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(cellName, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(cellName, forIndexPath: indexPath) 
         
         var value = ""
         
@@ -314,7 +316,7 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
                     let textFieldSize = CGSize(width: cellBounds.size.width-originOffset, height: cellBounds.size.height)
                     let textFieldBounds = CGRect(origin: textFieldOrigin, size: textFieldSize)
                     // init the text field
-                    var textField = UITextField(frame: textFieldBounds)
+                    let textField = UITextField(frame: textFieldBounds)
                     textField.autoresizingMask = .FlexibleHeight
                     textField.autoresizesSubviews = true
                     textField.borderStyle = .None
@@ -345,7 +347,7 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
 
         if UIImagePickerController.isSourceTypeAvailable(UIImagePickerControllerSourceType.PhotoLibrary){
             
-            var imagePicker = UIImagePickerController()
+            let imagePicker = UIImagePickerController()
             
             imagePicker.delegate = self
             imagePicker.sourceType = UIImagePickerControllerSourceType.PhotoLibrary;
@@ -355,7 +357,9 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
         }
     }
     
-    func imagePickerController(picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [NSObject: AnyObject]){
+    // MARK: - image picker methods
+    
+    func imagePickerController(picker: UIImagePickerController, didFinishPickingMediaWithInfo info: [String: AnyObject]){
         
         if let  image = info[UIImagePickerControllerOriginalImage] as? UIImage {
             
@@ -393,6 +397,8 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
         self.dismissViewControllerAnimated(true, completion:nil)
     }
     
+    // MARK: - utility methods
+    
     func reloadScreenData() {
         self.refreshControl?.endRefreshing()
         
@@ -415,8 +421,6 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
             tableView.reloadData()
         }
     }
-    
-    // MARK: - manage list in sections
     
     private func getSectionRows(section: Int) -> [String] {
         var listOfStuff: [String]? = nil
@@ -441,7 +445,6 @@ class SocialProfileTableViewController: UITableViewController,  UINavigationCont
     }
     
     private func setSectionRows(section: Int, rows: [String]) {
-        var listOfStuff: [String]? = nil
         switch section {
         case 1:
             socialProfile!["interests"] = rows

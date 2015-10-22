@@ -29,6 +29,7 @@
 * development of this work.
 */
 
+// Initialization for CrititiqueManager
 class CritiqueInfo: NSObject {
     
     let isModerator: Bool!

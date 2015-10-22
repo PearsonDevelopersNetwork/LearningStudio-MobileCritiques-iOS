@@ -31,6 +31,7 @@
 
 import Foundation
 
+// Configuration for stage
 class StageConfig: NSObject {
     
     let recordAudio: Bool!

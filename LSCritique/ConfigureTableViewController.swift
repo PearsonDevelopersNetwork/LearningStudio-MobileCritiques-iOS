@@ -32,6 +32,7 @@
 import UIKit
 import CoreBluetooth
 
+// Critique configuration for stage entry
 class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDelegate {
     
     var courseId: Int?
@@ -62,7 +63,7 @@ class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDe
     
     // MARK: - Alert about configuration
     
-    func peripheralManagerDidUpdateState(peripheral: CBPeripheralManager!) {
+    func peripheralManagerDidUpdateState(peripheral: CBPeripheralManager) {
         if peripheral.state == CBPeripheralManagerState.PoweredOn {
             dispatch_async(dispatch_get_main_queue()) {
                 let alertController = UIAlertController(title: "Bluetooth", message:
@@ -91,7 +92,7 @@ class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDe
     override func tableView(tableView:UITableView, cellForRowAtIndexPath indexPath: NSIndexPath) -> UITableViewCell {
         
         
-        var cell = tableView.dequeueReusableCellWithIdentifier(configureCellIdentifier, forIndexPath: indexPath) as! UITableViewCell
+        let cell = tableView.dequeueReusableCellWithIdentifier(configureCellIdentifier, forIndexPath: indexPath) 
         
         switch indexPath.row {
         case 0:
@@ -116,7 +117,7 @@ class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDe
     
     override func tableView(tableView: UITableView, didSelectRowAtIndexPath indexPath: NSIndexPath) {
         
-        var optionName = getOptionName(indexPath.row)
+        let optionName = getOptionName(indexPath.row)
         if let optionFlag = optionConfig[optionName] {
             optionConfig[optionName] = !optionFlag
         }
@@ -142,7 +143,7 @@ class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDe
     }
     
     private func getOptionValue(row:Int) -> Bool {
-        var optionName = getOptionName(row)
+        let optionName = getOptionName(row)
         if let optionFlag = optionConfig[optionName] {
             return optionFlag
         }
@@ -158,7 +159,7 @@ class ConfigureTableViewController: UITableViewController, CBPeripheralManagerDe
         tabBarController.courseId = courseId
         tabBarController.docSharingCategoryId = docSharingCategoryId
         
-        var stageConfig = StageConfig(recordAudio: getOptionValue(0),
+        let stageConfig = StageConfig(recordAudio: getOptionValue(0),
                                         showTimer: getOptionValue(1))
         tabBarController.stageConfig = stageConfig
     }

@@ -32,10 +32,13 @@
 import Foundation
 import MultipeerConnectivity
 
+// This tutorial was extremely helpful in putting this together
 // http://www.ralfebert.de/tutorials/ios-swift-multipeer-connectivity/
 
+// Provides peer to peer logic for the critique 
 class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbyServiceBrowserDelegate, MCSessionDelegate {
 
+    // The peer-to-peer apps share these properties
     private let serviceType = "lscritique"
     private let serviceTimeout = 5.0
     
@@ -44,6 +47,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
     private var peerId: MCPeerID!
     private var session: MCSession!
     
+    // each connected app has these properties
     private var managedCourseId: Int!
     private var managedCritiqueId: Int!
     private var managedPersonaId:String!
@@ -124,9 +128,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
                 }
             }
        
-
-            
-            // let the ui when the stage changes, so it can update itself
+            // let the ui know when the stage changes, so it can update itself
             stageAvailabilityChange(newStageAvailability, presenterPersonaId: presentingPersonaId, critiqueForPersonaId: self.critiqueForPersonaId)
         }
     }
@@ -146,7 +148,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
     private var pendingPresentingPersonaId: String?
     private var critiqueForPersonaId: String!
     
-    // is initialized with flag for moderator vs non-moderator mode
+    // is initialized with critique config info for user
     init(critiqueInfo: CritiqueInfo) {
         
         super.init()
@@ -198,6 +200,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
 
     }
     
+    // shared logic to restart moderator anew
     private func restartModeratorServices() {
         serviceAdvertiser.stopAdvertisingPeer()
         serviceBrowser.stopBrowsingForPeers()
@@ -214,6 +217,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
     }
     
+    // timestamp is used to prevent users from seeing phantoms from moderator
     private func newTimestamp() -> Int64 {
         return Int64((NSDate().timeIntervalSinceReferenceDate))
     }
@@ -232,12 +236,14 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
             advertiseServiceType += "-hand" // hands
         }
         
-        var critiqueSessionInfo: [NSObject:AnyObject] = [
+        // send data with the adverisement
+        var critiqueSessionInfo: [String:String] = [
             "courseId" : String(managedCourseId),
             "critiqueId" : String(managedCritiqueId),
             "timeStamp" : String(self.newTimestamp())
         ]
         
+        // the advertisement data differs by user type
         if isModerator {
             if self.presentingPersonaId != nil {
                 critiqueSessionInfo["personaId"]  = self.presentingPersonaId
@@ -252,7 +258,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
         
         // advertiser is initialized
-        var advertiser = MCNearbyServiceAdvertiser(peer: peerId, discoveryInfo: critiqueSessionInfo, serviceType: advertiseServiceType)
+        let advertiser = MCNearbyServiceAdvertiser(peer: peerId, discoveryInfo: critiqueSessionInfo, serviceType: advertiseServiceType)
         advertiser.delegate = self
         
         return advertiser
@@ -279,7 +285,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
         
         // browser is initialized
-        var browser = MCNearbyServiceBrowser(peer: peerId, serviceType: browseServiceType)
+        let browser = MCNearbyServiceBrowser(peer: peerId, serviceType: browseServiceType)
         browser.delegate = self
         
         return browser
@@ -288,34 +294,35 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
     
     // advertising - Moderators advertise status. Students advertise interests.
 
-    func advertiser(advertiser: MCNearbyServiceAdvertiser!, didNotStartAdvertisingPeer error: NSError!) {
+    func advertiser(advertiser: MCNearbyServiceAdvertiser, didNotStartAdvertisingPeer error: NSError) {
     }
     
-    func advertiser(advertiser: MCNearbyServiceAdvertiser!, didReceiveInvitationFromPeer peerID: MCPeerID!, withContext context: NSData!, invitationHandler: ((Bool, MCSession!) -> Void)!) {
+    // Students receive invitations to take stage from the moderator while their hands are raised
+    func advertiser(advertiser: MCNearbyServiceAdvertiser, didReceiveInvitationFromPeer peerID: MCPeerID, withContext context: NSData?, invitationHandler: ((Bool, MCSession) -> Void)) {
         
         if isModerator {
             
             // The advertisement is the status of the stage. No reason to accept these
-            invitationHandler(false, nil)
+            invitationHandler(false, self.session)
         }
         else {
             
             // check context to be sure it's what we expect (courseId, docSharingCategoryId)
             
             if context == nil { // not something we trust
-                invitationHandler(false, nil)
+                invitationHandler(false, self.session)
                 return
             }
             
-            var contextString = NSString(data: context, encoding:NSUTF8StringEncoding)
+            let contextString = NSString(data: context!, encoding:NSUTF8StringEncoding)
             var peerCourseId, peerCritiqueId, peerPersonaId: String?
             if contextString != nil {
                 // Need to validate the first two parts of this string
                 var contextStringParts = contextString!.componentsSeparatedByString(":")
                 if contextStringParts.count == 3 {
-                    peerCourseId = contextStringParts[0] as? String
-                    peerCritiqueId = contextStringParts[1] as? String
-                    peerPersonaId = contextStringParts[2] as? String
+                    peerCourseId = contextStringParts[0]
+                    peerCritiqueId = contextStringParts[1]
+                    peerPersonaId = contextStringParts[2]
                 }
             }
             // verify the contextString is present and matches
@@ -323,7 +330,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
                 || peerCourseId! != String(managedCourseId)
                 || peerCritiqueId! != String(managedCritiqueId)  {
                 // not our critique
-                invitationHandler(false, nil)
+                invitationHandler(false, self.session)
                 return
             }
             
@@ -338,38 +345,39 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
     }
     
     
-    // browsing (student with raised hand)
+    // browsing  - Moderators observe students with raised hands. Students observe the moderator's presence
 
-    func browser(browser: MCNearbyServiceBrowser!, didNotStartBrowsingForPeers error: NSError!) {
+    func browser(browser: MCNearbyServiceBrowser, didNotStartBrowsingForPeers error: NSError) {
     }
     
-    func browser(browser: MCNearbyServiceBrowser!, foundPeer peerID: MCPeerID!, withDiscoveryInfo info: [NSObject : AnyObject]!) {
+    // finding a new peer may alter the stage
+    func browser(browser: MCNearbyServiceBrowser, foundPeer peerID: MCPeerID, withDiscoveryInfo info: [String : String]?) {
         
         if info == nil { // not something we trust
             return
         }
         
-        var courseId:AnyObject? = info["courseId"]
-        var critiqueId:AnyObject? = info["critiqueId"]
-        var personaId:AnyObject? = info["personaId"]
-        var critiquePersonaId:AnyObject? = info["critiquePersonaId"]
-        var timestamp:AnyObject? = info["timeStamp"]
+        let courseId:AnyObject? = info!["courseId"]
+        let critiqueId:AnyObject? = info!["critiqueId"]
+        let personaId:AnyObject? = info!["personaId"]
+        let critiquePersonaId:AnyObject? = info!["critiquePersonaId"]
+        let timestamp:AnyObject? = info!["timeStamp"]
         
-        var validCourseId = courseId != nil && courseId! is String && (courseId as! String) == String(managedCourseId)
-        var validCritiqueId = critiqueId != nil && courseId! is String && (critiqueId as! String) == String(managedCritiqueId)
+        let validCourseId = courseId != nil && courseId! is String && (courseId as! String) == String(managedCourseId)
+        let validCritiqueId = critiqueId != nil && courseId! is String && (critiqueId as! String) == String(managedCritiqueId)
         var validPersonaId = personaId == nil || personaId! is String
         if personaId == nil && isModerator { // students should advertise their personaId
             validPersonaId = false
         }
-        var validCritiquePersonaId = critiquePersonaId == nil || critiquePersonaId! is String
-        var validTimestamp = isModerator || (timestamp != nil && timestamp! is String)
+        let validCritiquePersonaId = critiquePersonaId == nil || critiquePersonaId! is String
+        let  validTimestamp = isModerator || (timestamp != nil && timestamp! is String)
         
         if !validCourseId || !validCritiqueId || !validPersonaId || !validCritiquePersonaId || !validTimestamp { // not our critique
             return
         }
         
         if !isModerator {
-            var thisTimestamp: Int64? = (timestamp as! NSString).longLongValue
+            let thisTimestamp: Int64? = (timestamp as! NSString).longLongValue
             
             if lastConnectTime > 0 { // not the first connection
                 
@@ -399,8 +407,8 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
             lastConnectTime = thisTimestamp!
         }
         
-        var personaIdString = info["personaId"] as? String
-        var critiquePersonaIdString = critiquePersonaId as? String
+        var personaIdString = info!["personaId"]
+        let critiquePersonaIdString = critiquePersonaId as? String
         
         if personaIdString == nil && critiquePersonaIdString != nil {
             personaIdString = critiquePersonaIdString
@@ -413,8 +421,8 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
                 self.stageAvailability = false
                 self.connectedPeer = peerID
                 
-                var contextData = "\(managedCourseId):\(managedCritiqueId):\(managedPersonaId)".dataUsingEncoding(NSUTF8StringEncoding)
-                browser.invitePeer(connectedPeer, toSession: self.session, withContext: contextData, timeout: serviceTimeout)
+                let contextData = "\(managedCourseId):\(managedCritiqueId):\(managedPersonaId)".dataUsingEncoding(NSUTF8StringEncoding)
+                browser.invitePeer(connectedPeer!, toSession: self.session, withContext: contextData, timeout: serviceTimeout)
                 serviceAdvertiser.stopAdvertisingPeer()
                 dispatch_after( // don't let this hang forever
                     dispatch_time(DISPATCH_TIME_NOW,Int64(serviceTimeout * 2 * Double(NSEC_PER_SEC))), // # seconds
@@ -456,6 +464,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
                 stageAvailability = true
             }
             else {
+                // it depends on whether it's a critique and if the user is being critiqued
                 if critiquePersonaIdString != nil && critiquePersonaIdString == personaIdString && personaIdString != managedPersonaId {
                     presentingPersonaId = nil
                     critiqueForPersonaId = personaIdString
@@ -470,7 +479,8 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
     }
 
-    func browser(browser: MCNearbyServiceBrowser!, lostPeer peerID: MCPeerID!) {
+    // losing a peer can change the stage
+    func browser(browser: MCNearbyServiceBrowser, lostPeer peerID: MCPeerID) {
 
         if isModerator {
             // Release the stage when the peer disappears
@@ -497,18 +507,9 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
     }
     
-    // session (both)
+    // session  - Used by moderator and student to observe changes in peer while connected
     
-    func session(session: MCSession!, peer peerID: MCPeerID!, didChangeState state: MCSessionState) {
-        
-        var stateString = ""
-        switch(state) {
-        case .NotConnected: stateString = "NotConnected"
-        case .Connecting: stateString = "Connecting"
-        case .Connected: stateString = "Connected"
-        default: stateString = "Unknown"
-        }
-
+    func session(session: MCSession, peer peerID: MCPeerID, didChangeState state: MCSessionState) {
         if isModerator {
             // Confirm or Release stage for connected student
             if peerID == connectedPeer {
@@ -556,16 +557,16 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
     }
     
-    func session(session: MCSession!, didReceiveData data: NSData!, fromPeer peerID: MCPeerID!) {
+    func session(session: MCSession, didReceiveData data: NSData, fromPeer peerID: MCPeerID) {
     }
     
-    func session(session: MCSession!, didReceiveStream stream: NSInputStream!, withName streamName: String!, fromPeer peerID: MCPeerID!) {
+    func session(session: MCSession, didReceiveStream stream: NSInputStream, withName streamName: String, fromPeer peerID: MCPeerID) {
     }
     
-    func session(session: MCSession!, didFinishReceivingResourceWithName resourceName: String!, fromPeer peerID: MCPeerID!, atURL localURL: NSURL!, withError error: NSError!) {
+    func session(session: MCSession, didFinishReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, atURL localURL: NSURL, withError error: NSError?) {
     }
     
-    func session(session: MCSession!, didStartReceivingResourceWithName resourceName: String!, fromPeer peerID: MCPeerID!, withProgress progress: NSProgress!) {
+    func session(session: MCSession, didStartReceivingResourceWithName resourceName: String, fromPeer peerID: MCPeerID, withProgress progress: NSProgress) {
     }
 
     
@@ -626,6 +627,7 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         session.disconnect()
     }
     
+    // moderator has the ability to take the stage from a user
     func releaseStage() {
         if isModerator {
             self.stageAvailability = false
@@ -636,10 +638,11 @@ class CritiqueManager : NSObject, MCNearbyServiceAdvertiserDelegate, MCNearbySer
         }
     }
     
+    // notifies delegates of changes to stage
     private func stageAvailabilityChange(available:Bool, presenterPersonaId: String?, critiqueForPersonaId: String?) {
         
         if delegate != nil {
-            var critiqueInfo = CritiqueInfo(personaId: managedPersonaId, isModerator: isModerator, courseId: managedCourseId, critiqueId: managedCritiqueId)
+            let critiqueInfo = CritiqueInfo(personaId: managedPersonaId, isModerator: isModerator, courseId: managedCourseId, critiqueId: managedCritiqueId)
         
             delegate!.critiqueAvailabilityChanged(critiqueInfo , available: available, personaId: presenterPersonaId, critiqueForPersonaId: critiqueForPersonaId)
         }
